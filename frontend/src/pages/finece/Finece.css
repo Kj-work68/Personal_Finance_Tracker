@@ -1,11 +1,143 @@
-.income-header {
-  background-color: #1e5b75;
+/* Container หลัก */
+.calendar-container {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.col-category {
-  min-width: 180px;
+/* Header สลับเดือน */
+.calendar-month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
 }
 
-.input-amount {
-  width: 75px;
+.calendar-month-title {
+  margin: 0;
+  font-weight: 700;
+  color: #000000;
+}
+
+/* Layout Grid ของปฏิทิน 7 คอลัมน์ */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+/* หัวข้อวัน อา.-ส. */
+.calendar-header-day {
+  text-align: center;
+  font-weight: bold;
+  padding: 8px 0;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+/* ช่องกล่องวันที่ */
+.calendar-cell {
+  min-height: 85px;
+  background-color: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease-in-out;
+}
+
+.calendar-cell:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.calendar-cell.empty {
+  background-color: transparent;
+  border: none;
+  cursor: default;
+}
+
+.calendar-cell.empty:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.day-number {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.day-summary {
+  font-size: 0.8rem;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* Modal Pop-up Layout */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content-custom {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* รายการบันทึกใน Pop-up */
+.transaction-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+/* ปุ่มกดทั่วไป */
+.btn-close-custom {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close-custom:hover {
+  background-color: #f8f9fa;
+  color: #000;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.btn-icon:hover {
+  background-color: #fee2e2;
 }

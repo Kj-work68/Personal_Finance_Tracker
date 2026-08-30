@@ -1,166 +1,232 @@
-import React, {useState} from "react";
-import './Finece.css';
+import React, { useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import "./Finece.css";
 
-// 1. ครอบ Props ทั้งหมดด้วย Object { ... }
-// 2. ตั้งค่า default ให้ months เป็น MONTHS ถ้าไม่ได้ส่งมา
-const DEFAULT_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEPT', 'OCT', 'NOV', 'DEC'];
+const INITIAL_TRANSACTIONS = {
+  "2026-08-15": [
+    { id: 1, type: "income", title: "เงินเดือนเข้า", amount: 25000 },
+    { id: 2, type: "expense", title: "ค่าชาบู", amount: 499 }
+  ],
+  "2026-08-16": [
+    { id: 3, type: "expense", title: "ค่าน้ำมัน", amount: 800 }
+  ]
+};
 
-const INITIAL_INCOME = [
-  { id: 1, name: 'Paycheck 1', monthly: [5987, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-  { id: 2, name: 'Paycheck 2', monthly: [200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-  { id: 3, name: 'Side Income', monthly: [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+const MONTH_NAMES = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
 ];
 
 function Finece() {
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 7, 1));
+  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+  const [selectedDateStr, setSelectedDateStr] = useState(null);
+  const [formData, setFormData] = useState({ title: "", type: "expense", amount: "" });
 
-    const [items, setItems] = useState(INITIAL_INCOME);
-  const [newItemName, setNewItemName] = useState('');
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
 
-  // 1. Helper Function: คำนวณยอดรวมรายหมวดหมู่
-  const getRowTotal = (monthlyArray) => 
-    monthlyArray.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
 
-  // Helper Function: ฟอร์แมตตัวเลข
-  const formatNum = (val) => 
-    val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // 2. CREATE: เพิ่มหมวดหมู่ใหม่
+  const calendarCells = [];
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calendarCells.push(null);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const formattedDay = String(day).padStart(2, '0');
+    const formattedMonth = String(month + 1).padStart(2, '0');
+    const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+    calendarCells.push({ day, dateStr });
+  }
+
+  const getCumulativeBalanceOnDate = (targetDateStr) => {
+    const [targetYear, targetMonth] = targetDateStr.split('-');
+
+    const sortedDates = Object.keys(transactions).sort();
+
+    let runningBalance = 0;
+    let hasTransaction = false;
+
+    for (const dateStr of sortedDates) {
+      const [itemYear, itemMonth] = dateStr.split('-');
+
+      if (itemYear !== targetYear || itemMonth !== targetMonth) continue;
+      
+      if (dateStr > targetDateStr) break;
+
+      const dayItems = transactions[dateStr] || [];
+      if (dayItems.length > 0) hasTransaction = true;
+
+      dayItems.forEach(item => {
+        if (item.type === 'income') runningBalance += item.amount;
+        if (item.type === 'expense') runningBalance -= item.amount;
+      });
+    }
+
+    return { balance: runningBalance, hasData: hasTransaction };
+  };
+
+  const handleOpenModal = (dateStr) => {
+    setSelectedDateStr(dateStr);
+    setFormData({ title: "", type: "expense", amount: "" });
+  };
+
+  const handleCloseModal = () => setSelectedDateStr(null);
+
   const handleAddItem = (e) => {
     e.preventDefault();
-    if (!newItemName.trim()) return;
+    if (!formData.title.trim() || !formData.amount) return;
 
     const newItem = {
       id: Date.now(),
-      name: newItemName.trim(),
-      monthly: Array(12).fill(0)
+      title: formData.title.trim(),
+      type: formData.type,
+      amount: Number(formData.amount)
     };
 
-    setItems([...items, newItem]);
-    setNewItemName('');
+    const dayItems = transactions[selectedDateStr] || [];
+    setTransactions({
+      ...transactions,
+      [selectedDateStr]: [...dayItems, newItem]
+    });
+
+    setFormData({ title: "", type: "expense", amount: "" });
   };
 
-  // 3. UPDATE: แก้ไขชื่อหมวดหมู่
-  const handleNameChange = (id, newName) => {
-    setItems(items.map(item => item.id === id ? { ...item, name: newName } : item));
-  };
-
-  // UPDATE: แก้ไขจำนวนเงินในแต่ละเดือน
-  const handleAmountChange = (id, monthIdx, value) => {
-    setItems(items.map(item => {
-      if (item.id === id) {
-        const updatedMonthly = [...item.monthly];
-        updatedMonthly[monthIdx] = Number(value) || 0;
-        return { ...item, monthly: updatedMonthly };
-      }
-      return item;
-    }));
-  };
-
-  // 4. DELETE: ลบหมวดหมู่
   const handleDeleteItem = (id) => {
-    setItems(items.filter(item => item.id !== id));
+    const dayItems = transactions[selectedDateStr] || [];
+    const updatedItems = dayItems.filter(item => item.id !== id);
+
+    setTransactions({
+      ...transactions,
+      [selectedDateStr]: updatedItems
+    });
   };
 
   return (
-<div className="container py-4">
-      {/* Form สำหรับ CREATE หมวดหมู่ใหม่ */}
-      <form onSubmit={handleAddItem} className="row g-2 mb-3">
-        <div className="col-auto">
-          <input
-            type="text"
-            className="form-control form-control-sm"
-            placeholder="เพิ่มหมวดหมู่ใหม่..."
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-          />
-        </div>
-        <div className="col-auto">
-          <button type="submit" className="btn btn-primary btn-sm">
-            + เพิ่มหมวดหมู่
-          </button>
-        </div>
-      </form>
-
-      {/* READ & UPDATE Table */}
-      <div className="card border-0 shadow-sm">
-        <div className="card-header fw-bold text-white income-header d-flex justify-content-between align-items-center">
-          <span>Income Matrix</span>
-          <span className="badge bg-light text-dark">จำนวน {items.length} รายการ</span>
-        </div>
-        <div className="card-body p-0 table-responsive">
-          <table className="table table-bordered table-sm mb-0 align-middle">
-            <thead className="table-light">
-              <tr>
-                <th className="text-start ps-3 col-category">Category</th>
-                {DEFAULT_MONTHS.map((m) => (
-                  <th key={m} className="text-center">{m}</th>
-                ))}
-                <th className="text-end pe-3">Annually</th>
-                <th className="text-center col-action">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  {/* UPDATE Name */}
-                  <td className="ps-2">
-                    <input
-                      type="text"
-                      className="form-control form-control-sm border-0 bg-transparent fw-medium"
-                      value={item.name}
-                      onChange={(e) => handleNameChange(item.id, e.target.value)}
-                    />
-                  </td>
-
-                  {/* UPDATE Monthly Values */}
-                  {item.monthly.map((val, monthIdx) => (
-                    <td key={monthIdx} className="text-center">
-                      <div className="d-flex align-items-center justify-content-center">
-                        <span className="me-1 text-muted">$</span>
-                        <input
-                          type="number"
-                          className="form-control form-control-sm text-end input-amount"
-                          value={val || ''}
-                          onChange={(e) => handleAmountChange(item.id, monthIdx, e.target.value)}
-                        />
-                      </div>
-                    </td>
-                  ))}
-
-                  {/* READ Annually Total */}
-                  <td className="text-end fw-bold pe-3">
-                    ${formatNum(getRowTotal(item.monthly))}
-                  </td>
-
-                  {/* DELETE Button */}
-                  <td className="text-center">
-                    <button
-                      type="button"
-                      className="btn btn-outline-danger btn-sm py-0 px-2"
-                      onClick={() => handleDeleteItem(item.id)}
-                      title="ลบรายการ"
-                    >
-                      &times;
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={15} className="text-center py-3 text-muted">
-                    ยังไม่มีข้อมูล กรุณาเพิ่มหมวดหมู่ใหม่
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+    <div className="calendar-container py-4">
+      {/* Header สลับเดือน */}
+      <div className="calendar-month-header">
+        <button className="btn btn-outline-secondary btn-sm" onClick={handlePrevMonth}>
+          <ChevronLeft size={20} />
+        </button>
+        <h3 className="calendar-month-title">
+          {MONTH_NAMES[month]} {year + 543}
+        </h3>
+        <button className="btn btn-outline-secondary btn-sm" onClick={handleNextMonth}>
+          <ChevronRight size={20} />
+        </button>
       </div>
+
+      {/* Grid ปฏิทิน */}
+      <div className="calendar-grid">
+        {["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((d, i) => (
+          <div key={d} className={`calendar-header-day ${i === 0 ? "text-danger" : ""}`}>
+            {d}
+          </div>
+        ))}
+
+        {calendarCells.map((cell, idx) => {
+          if (!cell) return <div key={`empty-${idx}`} className="calendar-cell empty"></div>;
+
+          const { balance, hasData } = getCumulativeBalanceOnDate(cell.dateStr);
+
+          return (
+            <div
+              key={cell.dateStr}
+              className="calendar-cell"
+              onClick={() => handleOpenModal(cell.dateStr)}
+            >
+              <div className="day-number">{cell.day}</div>
+              <div className="day-summary">
+                {hasData && (
+                  <div className={`fw-bold ${balance >= 0 ? "text-primary" : "text-danger"}`}>
+                    ฿{balance.toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pop-up (Modal) */}
+      {selectedDateStr && (
+        <div className="modal-backdrop">
+          <div className="modal-content-custom">
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+              <h5 className="m-0 fw-bold">บันทึกรายการ: {selectedDateStr}</h5>
+              <button className="btn-close-custom" onClick={handleCloseModal}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddItem} className="row g-2 mb-3">
+              <div className="col-4">
+                <select
+                  className="form-select form-select-sm"
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                >
+                  <option value="expense">รายจ่าย</option>
+                  <option value="income">รายรับ</option>
+                </select>
+              </div>
+              <div className="col-5">
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="ชื่อรายการ"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                />
+              </div>
+              <div className="col-3">
+                <input
+                  type="number"
+                  className="form-control form-control-sm"
+                  placeholder="จำนวนเงิน"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                />
+              </div>
+              <div className="col-12 text-end">
+                <button type="submit" className="btn btn-primary btn-sm w-100">
+                  <Plus size={16} className="me-1" /> เพิ่มรายการ
+                </button>
+              </div>
+            </form>
+
+            <div className="transaction-list">
+              {(transactions[selectedDateStr] || []).length === 0 ? (
+                <div className="text-center text-muted py-3">ยังไม่มีรายการในวันนี้</div>
+              ) : (
+                (transactions[selectedDateStr] || []).map((item) => (
+                  <div key={item.id} className="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                      <span className="fw-medium">{item.title}</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className={item.type === "income" ? "text-success fw-bold" : "text-danger fw-bold"}>
+                        {item.type === "income" ? "+" : "-"}{item.amount.toLocaleString()}
+                      </span>
+                      <button className="btn-icon text-danger" onClick={() => handleDeleteItem(item.id)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default Finece;
-
-
