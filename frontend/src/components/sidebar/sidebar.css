@@ -1,0 +1,178 @@
+  .sidebar-layout {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    gap: 10px;
+  }
+
+  /* Sidebar สภาวะปกติ */
+  .sidebar {
+    width: 200px;
+    background-color: #d35400;
+    color: #ffffff;
+    transition: width 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+  }
+
+  /* Sidebar สภาวะหุบเข้า (เหลือแค่ความกว้างไอคอน) */
+  .sidebar-layout.collapsed .sidebar {
+    width: 70px;
+  }
+
+  /* Header & ปุ่ม Toggle */
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #b6866e;
+  }
+
+  .sidebar-layout.collapsed .sidebar-header {
+    justify-content: center;
+  }
+
+  .toggle-btn {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 4px 8px;
+  }
+
+  /* Menu Items */
+  .sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem;
+    color: #ffffff;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: #b6866e;
+    text-decoration: none;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  /* จัดไอคอนให้อยู่ตรงกลางพอดีเมื่อหุบ */
+  .sidebar-layout.collapsed .menu-item {
+    justify-content: center;
+    padding: 0.75rem 0;
+  }
+
+  .menu-item.active,
+  .menu-item:hover {
+    background-color: #b6866e;
+    color: #ffffff;
+  }
+
+  .menu-item .icon {
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .menu-item .label {
+    margin-left: 0.75rem;
+    color: #ffffff;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background-color: #f8fafc;
+    transition: margin-left 0.3s ease;
+  }
+
+  /* Topbar Layout */
+  .topbar {
+    height: 64px;
+    background-color: #d35400;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.75rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: #dadbdc;
+    border-radius: 8px;
+  }
+
+  /* Notification Icon */
+  .icon-badge-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  .icon-badge-wrapper .p-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 1.1rem;
+    height: 1.1rem;
+    line-height: 1.1rem;
+    font-size: 0.65rem;
+  }
+
+  /* User Panel */
+  .user-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    background-color: #fff6ed;
+    border: 1px solid #dadbdc;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+
+  .user-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .user-role {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .logout-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .logout-icon-btn:hover {
+    background-color: #fff6ed;
+  }
