@@ -1,16 +1,15 @@
-import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
-import "./Finece.css";
+import React, { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
-const INITIAL_TRANSACTIONS = {
-  "2026-08-15": [
-    { id: 1, type: "income", title: "เงินเดือนเข้า", amount: 25000 },
-    { id: 2, type: "expense", title: "ค่าชาบู", amount: 499 }
-  ],
-  "2026-08-16": [
-    { id: 3, type: "expense", title: "ค่าน้ำมัน", amount: 800 }
-  ]
-};
+// Import PrimeReact Components
+import { Dialog } from "primereact/dialog";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Tag } from "primereact/tag";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
+
+import { getTransactions, createTransaction, deleteTransaction } from "../../services/Api";
+import "./Finece.css";
 
 const MONTH_NAMES = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -19,9 +18,32 @@ const MONTH_NAMES = [
 
 function Finece() {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 7, 1));
-  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState({});
   const [selectedDateStr, setSelectedDateStr] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ title: "", type: "expense", amount: "" });
+
+  const pullTransactionData = async () => {
+    try {
+      const data = await getTransactions();
+      const formatted = {};
+      if (Array.isArray(data)) {
+        data.forEach((item) => {
+          if (!formatted[item.date]) {
+            formatted[item.date] = [];
+          }
+          formatted[item.date].push(item);
+        });
+      }
+      setTransactions(formatted);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+    }
+  };
+
+  useEffect(() => {
+    pullTransactionData();
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -45,7 +67,6 @@ function Finece() {
 
   const getCumulativeBalanceOnDate = (targetDateStr) => {
     const [targetYear, targetMonth] = targetDateStr.split('-');
-
     const sortedDates = Object.keys(transactions).sort();
 
     let runningBalance = 0;
@@ -53,15 +74,14 @@ function Finece() {
 
     for (const dateStr of sortedDates) {
       const [itemYear, itemMonth] = dateStr.split('-');
-
       if (itemYear !== targetYear || itemMonth !== targetMonth) continue;
-      
       if (dateStr > targetDateStr) break;
 
       const dayItems = transactions[dateStr] || [];
       if (dayItems.length > 0) hasTransaction = true;
 
       dayItems.forEach(item => {
+
         if (item.type === 'income') runningBalance += item.amount;
         if (item.type === 'expense') runningBalance -= item.amount;
       });
@@ -73,42 +93,88 @@ function Finece() {
   const handleOpenModal = (dateStr) => {
     setSelectedDateStr(dateStr);
     setFormData({ title: "", type: "expense", amount: "" });
+    setIsModalOpen(true);
   };
 
-  const handleCloseModal = () => setSelectedDateStr(null);
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedDateStr(null);
+  };
 
-  const handleAddItem = (e) => {
+  const handleAddItem = async (e) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.amount) return;
 
-    const newItem = {
-      id: Date.now(),
+    const payload = {
+      date: selectedDateStr,
       title: formData.title.trim(),
       type: formData.type,
       amount: Number(formData.amount)
     };
 
-    const dayItems = transactions[selectedDateStr] || [];
-    setTransactions({
-      ...transactions,
-      [selectedDateStr]: [...dayItems, newItem]
-    });
+    try {
+      await createTransaction(payload);
+      await pullTransactionData();
+      setFormData({ title: "", type: "expense", amount: "" });
+    } catch (error) {
+      console.error("Error adding item:", error);
+    }
+  };
 
-    setFormData({ title: "", type: "expense", amount: "" });
+  const executeDelete = async (id) => {
+    try {
+      await deleteTransaction(id);
+      await pullTransactionData();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
   };
 
   const handleDeleteItem = (id) => {
-    const dayItems = transactions[selectedDateStr] || [];
-    const updatedItems = dayItems.filter(item => item.id !== id);
-
-    setTransactions({
-      ...transactions,
-      [selectedDateStr]: updatedItems
+    confirmDialog({
+      message: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
+      header: 'ยืนยันการลบข้อมูล',
+      icon: 'pi pi-exclamation-triangle',
+      defaultFocus: 'reject',
+      acceptClassName: 'p-button-danger',
+      acceptLabel: 'ลบ',
+      rejectLabel: 'ยกเลิก',
+      accept: () => executeDelete(id), // ทำงานเมื่อกด "ลบ"
     });
+  };
+
+  // --- Templates สำหรับแสดงผลใน DataTable ---
+  const typeBodyTemplate = (rowData) => {
+    return rowData.type === 'income' 
+      ? <Tag severity="success" value="รายรับ"></Tag>
+      : <Tag severity="danger" value="รายจ่าย"></Tag>;
+  };
+
+const amountBodyTemplate = (rowData) => {
+  const isIncome = rowData.type === 'income';
+
+  return (
+    <span className={isIncome ? "text-success fw-bold" : "text-danger fw-bold"}>
+      {/* ใช้ออปชัน ?. เพื่อว่าถ้า amount จาก API เป็น null/undefined จะไม่พัง และ fallback ด้วย 0 */}
+      {isIncome ? "+" : "-"}{(rowData.amount?.toLocaleString() ?? 0)} ฿
+    </span>
+  );
+};
+
+  const actionBodyTemplate = (rowData) => {
+    return (
+      <button 
+        className="btn btn-link text-danger p-0 border-0" 
+        onClick={() => handleDeleteItem(rowData.id)}
+      >
+        <Trash2 size={16} />
+      </button>
+    );
   };
 
   return (
     <div className="calendar-container py-4">
+      <ConfirmDialog />
       {/* Header สลับเดือน */}
       <div className="calendar-month-header">
         <button className="btn btn-outline-secondary btn-sm" onClick={handlePrevMonth}>
@@ -154,77 +220,90 @@ function Finece() {
         })}
       </div>
 
-      {/* Pop-up (Modal) */}
-      {selectedDateStr && (
-        <div className="modal-backdrop">
-          <div className="modal-content-custom">
-            <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-              <h5 className="m-0 fw-bold">บันทึกรายการ: {selectedDateStr}</h5>
-              <button className="btn-close-custom" onClick={handleCloseModal}>
-                <X size={20} />
-              </button>
-            </div>
+      {/* PrimeReact Dialog (Modal) */}
+<Dialog
+        header={`บันทึกและสรุปรายการ: ${selectedDateStr}`}
+        visible={isModalOpen}
+        style={{ width: '50vw' }}
+        breakpoints={{ '960px': '75vw', '641px': '90vw' }}
+        onHide={handleCloseModal}
+      >
+        {/* ตาราง PrimeReact DataTable แสดงรายการ */}
+        <DataTable 
+          value={transactions[selectedDateStr] || []} 
+          emptyMessage="ยังไม่มีรายการในวันนี้"
+          responsiveLayout="scroll"
+          stripedRows
+          size="small"
+        >
+          <Column field="type" header="ประเภท" body={typeBodyTemplate} style={{ width: '15%' }} />
+          <Column field="title" header="รายการ" style={{ width: '45%' }} />
+          <Column field="amount" header="จำนวนเงิน" body={amountBodyTemplate} style={{ width: '25%' }} />
+          <Column body={actionBodyTemplate} style={{ width: '15%', textAlign: 'center' }} />
+        </DataTable>
 
-            <form onSubmit={handleAddItem} className="row g-2 mb-3">
-              <div className="col-4">
-                <select
-                  className="form-select form-select-sm"
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                >
-                  <option value="expense">รายจ่าย</option>
-                  <option value="income">รายรับ</option>
-                </select>
-              </div>
-              <div className="col-5">
-                <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  placeholder="ชื่อรายการ"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                />
-              </div>
-              <div className="col-3">
-                <input
-                  type="number"
-                  className="form-control form-control-sm"
-                  placeholder="จำนวนเงิน"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                />
-              </div>
-              <div className="col-12 text-end">
-                <button type="submit" className="btn btn-primary btn-sm w-100">
-                  <Plus size={16} className="me-1" /> เพิ่มรายการ
-                </button>
-              </div>
-            </form>
-
-            <div className="transaction-list">
-              {(transactions[selectedDateStr] || []).length === 0 ? (
-                <div className="text-center text-muted py-3">ยังไม่มีรายการในวันนี้</div>
-              ) : (
-                (transactions[selectedDateStr] || []).map((item) => (
-                  <div key={item.id} className="d-flex justify-content-between align-items-center border-bottom py-2">
-                    <div>
-                      <span className="fw-medium">{item.title}</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <span className={item.type === "income" ? "text-success fw-bold" : "text-danger fw-bold"}>
-                        {item.type === "income" ? "+" : "-"}{item.amount.toLocaleString()}
-                      </span>
-                      <button className="btn-icon text-danger" onClick={() => handleDeleteItem(item.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+        {/* ฟอร์มเพิ่มรายการ - ใช้ Inline Style บังคับแนวนอนเป๊ะๆ */}
+        <form 
+          onSubmit={handleAddItem} 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            gap: '8px', 
+            marginTop: '16px' 
+          }}
+        >
+          <div style={{ width: '110px', flexShrink: 0 }}>
+            <select
+              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            >
+              <option value="expense">รายจ่าย</option>
+              <option value="income">รายรับ</option>
+            </select>
           </div>
-        </div>
-      )}
+
+          <div style={{ flex: 1 }}>
+            <input
+              type="text"
+              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              placeholder="ชื่อรายการ"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
+          </div>
+
+          <div style={{ width: '110px', flexShrink: 0 }}>
+            <input
+              type="number"
+              style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              placeholder="จำนวนเงิน"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            />
+          </div>
+
+          <div style={{ flexShrink: 0 }}>
+            <button 
+              type="submit" 
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                padding: '6px 16px', 
+                backgroundColor: '#0d6efd', 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: '4px', 
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Plus size={16} style={{ marginRight: '4px' }} /> เพิ่ม
+            </button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
+	"strconv"
 
 	_ "github.com/glebarez/go-sqlite"
 )
@@ -15,7 +17,7 @@ type Transaction struct {
 	TxnDate string  `json:"date"`
 	Title   string  `json:"title"`
 	Type    string  `json:"type"`
-	Amount  float64 `json:"amount`
+	Amount  float64 `json:"amount"`
 }
 
 var db *sql.DB
@@ -34,6 +36,7 @@ func main() {
 	initDB()
 
 	http.HandleFunc("/api/transactions", handleTransactions)
+	http.HandleFunc("/api/transactions/", handleTransactions)
 
 	fmt.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -56,18 +59,23 @@ func initDB() {
 
 // Handler รองรับทั้ง GET (ดึงข้อมูล) และ POST (เพิ่มข้อมูล)
 func handleTransactions(w http.ResponseWriter, r *http.Request) {
-	// ตั้งค่า CORS ให้ React (Port 5173/3000) เรียกใช้งานได้
+	// CORS Headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
+	// ✅ ใช้ path.Base ดึง segmentสุดท้ายของ URL เช่น /api/transactions/4 -> "4"
+	basePath := path.Base(r.URL.Path)
+	id, errID := strconv.Atoi(basePath) // ถ้าแปลงเป็นตัวเลขได้ แสดงว่ามีการส่ง ID มาจริง
+
 	switch r.Method {
 	case "GET":
-		// ดึงรายการทั้งหมดเรียงตามวันที่
 		rows, err := db.Query("SELECT id, txn_date, title, type, amount FROM transactions ORDER BY txn_date ASC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -75,7 +83,7 @@ func handleTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 		defer rows.Close()
 
-		var list []Transaction
+		list := make([]Transaction, 0)
 		for rows.Next() {
 			var t Transaction
 			if err := rows.Scan(&t.ID, &t.TxnDate, &t.Title, &t.Type, &t.Amount); err != nil {
@@ -87,7 +95,6 @@ func handleTransactions(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(list)
 
 	case "POST":
-		// รับข้อมูล JSON จาก React เพื่อบันทึกเข้า DB
 		var t Transaction
 		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -101,10 +108,47 @@ func handleTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		id, _ := result.LastInsertId()
-		t.ID = int(id)
+		lastID, _ := result.LastInsertId()
+		t.ID = int(lastID)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(t)
+
+	case "PUT": // 👈 เพิ่ม Case การแก้ไขข้อมูล
+		if errID != nil || id <= 0 {
+			http.Error(w, "Invalid transaction ID", http.StatusBadRequest)
+			return
+		}
+
+		var t Transaction
+		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		_, err := db.Exec("UPDATE transactions SET txn_date = ?, title = ?, type = ?, amount = ? WHERE id = ?",
+			t.TxnDate, t.Title, t.Type, t.Amount, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Updated successfully"})
+
+	case "DELETE":
+		// ✅ เช็กว่า id แปลงเป็นตัวเลขสำเร็จหรือไม่
+		if errID != nil || id <= 0 {
+			http.Error(w, "Missing or invalid transaction ID", http.StatusBadRequest)
+			return
+		}
+
+		_, err := db.Exec("DELETE FROM transactions WHERE id = ?", id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Deleted successfully"})
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
